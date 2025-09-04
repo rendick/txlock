@@ -11,7 +11,12 @@
 #include <time.h>
 #include <unistd.h>
 
+#define INPUT_LENGTH 512
+
 #define randnum(max, min) ((rand() % ((max) - (min) + 1)) + (min))
+
+unsigned long int bg_color = 0xffffff;
+unsigned long int sqre_color = 0x000000;
 
 void die(char *msg) {
   fprintf(stderr, "%s\n", msg);
@@ -36,13 +41,13 @@ int main(void) {
 
   Display *dpy;
   Window win, root;
-  GC gc;
-  GC remove_sqre;
+  GC gc, wrong_passwd;
+  int screen;
 
-  char user_input[512] = {0};
+  char user_input[INPUT_LENGTH] = {0};
   int user_input_length = 0;
 
-  int x_rand_square_data[512], y_rand_square_data[512];
+  int x_rand_square_data[INPUT_LENGTH], y_rand_square_data[INPUT_LENGTH];
   int number_of_squares = 0;
 
   if (getuid())
@@ -53,19 +58,17 @@ int main(void) {
 
   XSetWindowAttributes attrs;
   attrs.override_redirect = True;
-
+  attrs.background_pixel = bg_color;
   root = DefaultRootWindow(dpy);
-  win = XCreateWindow(dpy, root, 0, 0, DisplayWidth(dpy, DefaultScreen(dpy)),
-                      DisplayHeight(dpy, DefaultScreen(dpy)), 0,
-                      DefaultDepth(dpy, DefaultScreen(dpy)), CopyFromParent,
-                      DefaultVisual(dpy, DefaultScreen(dpy)),
+  screen = DefaultScreen(dpy);
+  win = XCreateWindow(dpy, root, 0, 0, DisplayWidth(dpy, screen),
+                      DisplayHeight(dpy, screen), 0, DefaultDepth(dpy, screen),
+                      CopyFromParent, DefaultVisual(dpy, screen),
                       CWOverrideRedirect | CWBackPixel, &attrs);
   gc = XCreateGC(dpy, win, 0, NULL);
-  remove_sqre = XCreateGC(dpy, win, 0, NULL);
+  wrong_passwd = XCreateGC(dpy, win, 0, NULL);
 
-  XSetForeground(dpy, remove_sqre, 0x000000);
-  XSetFillStyle(dpy, remove_sqre, FillSolid);
-  XSetForeground(dpy, gc, 0xffffff);
+  XSetForeground(dpy, gc, sqre_color);
   XSetFillStyle(dpy, gc, FillSolid);
 
   XStoreName(dpy, win, "txlock");
@@ -79,36 +82,47 @@ int main(void) {
     switch (event.type) {
     case KeyPress:
       KeySym keysym = XLookupKeysym(&event.xkey, 0);
-      if (keysym > 32 && keysym < 127) {
-        int x_rand_coordinates = randnum(1920, 200),
-            y_rand_coordinates = randnum(1080, 200);
+      if (keysym > 32 && keysym < 127 && user_input_length < INPUT_LENGTH) {
+        int x_rand_coordinates =
+                randnum((((DisplayWidth(dpy, screen) - 1270) / 2) + 1270) - 100,
+                        (DisplayWidth(dpy, screen) - 1270) / 2),
+            y_rand_coordinates =
+                randnum((((DisplayHeight(dpy, screen) - 720) / 2) + 720) - 100,
+                        (DisplayHeight(dpy, screen) - 720) / 2);
         x_rand_square_data[number_of_squares] = x_rand_coordinates,
         y_rand_square_data[number_of_squares] = y_rand_coordinates;
+
         XDrawRectangle(dpy, win, gc, x_rand_coordinates, y_rand_coordinates,
                        100, 100);
 
         user_input[user_input_length++] = (char)keysym;
         user_input[user_input_length + 1] = '\0';
         number_of_squares++;
-
         XFlush(dpy);
       } else if (keysym == XK_BackSpace && user_input_length > 0) {
         user_input[user_input_length - 1] = '\0';
         user_input_length--;
 
-        XDrawRectangle(dpy, win, remove_sqre,
-                       x_rand_square_data[number_of_squares - 1],
-                       y_rand_square_data[number_of_squares - 1], 100, 100);
         x_rand_square_data[number_of_squares] = '\0',
         y_rand_square_data[number_of_squares] = '\0';
         number_of_squares--;
 
+        XClearWindow(dpy, win);
         XFlush(dpy);
+
+        for (int i = 0; i < number_of_squares; i++) {
+          XDrawRectangle(dpy, win, gc, x_rand_square_data[i],
+                         y_rand_square_data[i], 100, 100);
+          XFlush(dpy);
+        }
       } else if (keysym == XK_Return) {
         if (verify_passwd(user_input) == 0) {
           XCloseDisplay(dpy);
-
           return EXIT_SUCCESS;
+        } else {
+          XDrawString(dpy, win, wrong_passwd, 100, 100, "WRONG",
+                      strlen("WRONG"));
+          XFlush(dpy);
         }
       }
       break;
