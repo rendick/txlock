@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <pwd.h>
 #include <shadow.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,17 +19,17 @@
 #define randnum(max, min) ((rand() % ((max) - (min) + 1)) + (min))
 
 // potentially unsafe part of the code (global variables)
-unsigned long int bg_color = 0xffffff;
-unsigned long int sq_color = 0x000000;
-unsigned short int sq_width = 100;
-unsigned short int sq_height = 100;
+uint32_t bg_color = 0xffffff;
+uint32_t sq_color = 0x000000;
+uint16_t sq_width = 100;
+uint16_t sq_height = 100;
 
 char user_input[INPUT_LENGTH] = {0};
-int user_input_length = 0;
+uint16_t user_input_length = 0;
 
-int x_rand_square_data[INPUT_LENGTH], y_rand_square_data[INPUT_LENGTH];
+uint16_t x_rand_square_data[INPUT_LENGTH], y_rand_square_data[INPUT_LENGTH];
 
-int number_of_squares = 0;
+uint16_t number_of_squares = 0;
 
 void die(char *msg) {
   fprintf(stderr, "%s\n", msg);
@@ -53,7 +54,6 @@ int verify_passwd(char *password) {
 }
 
 void purge_sq(Display *dpy, Window win, GC gc) {
-  printf("UI: %d AND NS: %d\n", user_input_length, number_of_squares);
   user_input[user_input_length - 1] = '\0';
   user_input_length--;
 
@@ -125,12 +125,12 @@ int lockscreen() {
         break;
       }
       if (keysym > 32 && keysym < 127 && user_input_length < INPUT_LENGTH) {
-        int x_rand_coordinates =
-                randnum((((DisplayWidth(dpy, screen) - 1270) / 2) + 1270) - 100,
-                        (DisplayWidth(dpy, screen) - 1270) / 2),
+        int x_rand_coordinates = randnum(
+                (((DisplayWidth(dpy, screen) - 1270) >> 1) + 1270) - 100,
+                (DisplayWidth(dpy, screen) - 1270) >> 1),
             y_rand_coordinates =
-                randnum((((DisplayHeight(dpy, screen) - 720) / 2) + 720) - 100,
-                        (DisplayHeight(dpy, screen) - 720) / 2);
+                randnum((((DisplayHeight(dpy, screen) - 720) >> 1) + 720) - 100,
+                        (DisplayHeight(dpy, screen) - 720) >> 1);
         x_rand_square_data[number_of_squares] = x_rand_coordinates,
         y_rand_square_data[number_of_squares] = y_rand_coordinates;
         XFillRectangle(dpy, win, gc, x_rand_coordinates, y_rand_coordinates,
@@ -167,18 +167,18 @@ int lockscreen() {
 
 int main(int argc, char **argv) {
   for (int i = 0; i < argc; i++) {
-    if (strcmp(argv[i], "-bgcolor") == 0) {
+    if (strcmp(argv[i], "-bgcolor") == 0 || strcmp(argv[i], "-bg") == 0) {
       bg_color = strtoul(argv[i + 1], NULL, 0);
-    } else if (strcmp(argv[i], "-sqcolor") == 0) {
+    } else if (strcmp(argv[i], "-sqcolor") == 0 || strcmp(argv[i], "-c") == 0) {
       sq_color = strtoul(argv[i + 1], NULL, 0);
-    } else if (strcmp(argv[i], "-sqwidth") == 0) {
+    } else if (strcmp(argv[i], "-sqwidth") == 0 || strcmp(argv[i], "-sqw") == 0) {
       sq_width = atoi(argv[i + 1]);
-    } else if (strcmp(argv[i], "-sqheight") == 0) {
+    } else if (strcmp(argv[i], "-sqheight") == 0 || strcmp(argv[i], "-sqh") == 0) {
       sq_height = atoi(argv[i + 1]);
-    } else if (strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "-h") == 0) {
-      die("-fgcolor\tForeground color\n-bgcolor\tBackground color");
-    } else if (strcmp(argv[i], "-version") == 0 || strcmp(argv[i], "-v") == 0) {
-      die("txlock v0.1");
+    } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+      die("usage: txlock [-v] [-h] [-bg color] [-sqc color] [-sqw width] [-sqh height]");
+    } else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
+      die("TXLock v0.1");
     }
   }
 
